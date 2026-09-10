@@ -53,12 +53,12 @@ export default async function handler(req,res) {
       if(data.startsWith("aprobar:")){
         const{error}=await supabase.from("telegram_onboarding_p44").update({acceso_concedido:true,estado:"acceso_aprobado",fecha_acceso:new Date().toISOString(),verificado_por:"PROFESOR"}).eq("telegram_user_id",alumnoId);
         if(error){await tgSendMessage(chat_id,`❌ Error aprobando: ${error.message}`);return res.status(200).json({ok:true});}
-        await tgSendMessage(alumnoId,"✅ Verificación completada. Ya puedes acceder al grupo. Si aún no lo ves, escribe REVISAR.");
+        await tgSendMessage(alumnoId,"✅ <b>Verificación completada</b>. Ya tienes acceso al grupo. ¡Un saludo! 👋");
         const nuevoTexto=(cq.message.text||"").replace("Estado: Pendiente de verificación","Estado: ✅ APROBADO");
         await tgEditMessageText(chat_id,cq.message.message_id,nuevoTexto);
         return res.status(200).json({ok:true});
       }
-      const motivo="Los datos no coinciden con el formulario del alumno.";
+      const motivo="❌ <b>Acceso denegado</b>. Los datos aportados no coinciden con el formulario del alumno. Escribe a Miguel para solucionarlo. ¡Un saludo! 👋";
       const{error}=await supabase.from("telegram_onboarding_p44").update({acceso_concedido:false,estado:"acceso_denegado",fecha_verificacion:new Date().toISOString(),verificado_por:"PROFESOR",notas:motivo}).eq("telegram_user_id",alumnoId);
       if(error){await tgSendMessage(chat_id,`❌ Error denegando: ${error.message}`);return res.status(200).json({ok:true});}
       await tgSendMessage(alumnoId,motivo);
