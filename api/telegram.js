@@ -115,8 +115,8 @@ function msgPaso1() {
 function msgPaso2() {
   return (
     "Paso 2/5 ✅\n\n" +
-    "Solicita el acceso al grupo desde el Campus:\n\n" +
-    "1️⃣ Apartado <b>INICIO</b> dentro del Módulo/Curso <b> → “Solicitar acceso | Grupo TELEGRAM P44”</b>;\n\n" +
+    "Solicita el acceso al grupo desde el Campus, ¡OJO! recomendamos hacer este paso con tu teléfono móvil:\n\n" +
+    "1️⃣ Apartado <b>INICIO</b> dentro del Módulo/Curso <b> → “Solicitud de acceso al Grupo P44”</b>;\n\n" +
     "2️⃣ Se te abrirá la web o app de Telegram → Unirse al grupo o <i>Join group</i>.\n\n" +
     "Cuando lo hayas hecho, escribe: <b>HECHO</b>\n\n" +
     "(<i>Escribe MENU para volver al inicio</i>)"
@@ -127,8 +127,8 @@ function msgPaso3() {
   return (
     "Paso 3/5 ✅\n\n" +
     "Envíame en una sola línea:\n\n" +
-    "<b>Nombre y apellidos | Email con el que te has matriculado | Curso (Total43, Pack 3 Módulos, Intensivo)</b>\n\n" +
-    "Ejemplo:\nMiguel García Fernández | miguel.acrapol@acrapol.es | Curso Total43\n\n" +
+    "<b>Nombre y apellidos, Email con el que te has matriculado, Curso (Total44, Pack 3 Módulos, Intensivo)</b>\n\n" +
+    "Ejemplo:\nMiguel García Fernández, miguel.acrapol@acrapol.es, Curso Total44\n\n" +
     "(<i>Escribe MENU para volver al inicio</i>)"
   );
 }
