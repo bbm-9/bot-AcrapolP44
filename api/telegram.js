@@ -37,7 +37,7 @@ function mainMenuKeyboard() {
 
 async function getOrCreateUser(telegram_user_id, username) {
   const { data: existing } = await supabase
-    .from("telegram_onboarding")
+    .from("telegram_onboarding_p44")
     .select("*")
     .eq("telegram_user_id", telegram_user_id)
     .maybeSingle();
@@ -45,7 +45,7 @@ async function getOrCreateUser(telegram_user_id, username) {
   if (existing) return existing;
 
   const { data: created, error } = await supabase
-    .from("telegram_onboarding")
+    .from("telegram_onboarding_p44")
     .insert({ telegram_user_id, username, estado: "menu" })
     .select("*")
     .single();
@@ -56,7 +56,7 @@ async function getOrCreateUser(telegram_user_id, username) {
 
 async function updateUser(telegram_user_id, patch) {
   const { error } = await supabase
-    .from("telegram_onboarding")
+    .from("telegram_onboarding_p44")
     .update({ ...patch, ultima_interaccion: new Date().toISOString() })
     .eq("telegram_user_id", telegram_user_id);
 
