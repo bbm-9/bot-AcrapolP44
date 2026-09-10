@@ -12,7 +12,11 @@ async function tgSendMessage(chat_id, text, reply_markup) {
 async function tgAnswerCallbackQuery(callback_query_id) {
   await fetch(TG("answerCallbackQuery"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ callback_query_id }) });
 }
+async function tgEditMessageText(chat_id, message_id, text) {
+  await fetch(TG("editMessageText"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id, message_id, text }) });
+}
 function mainMenuKeyboard() { return { inline_keyboard: [[{ text: "🎓 Acceder al grupo de Telegram P44", callback_data: "acceso_grupo" }],[{ text: "❓ Escribir mensaje a Miguel", url: "https://t.me/Miguel_ACRAPOL" }]] }; }
+function verificationKeyboard(telegram_user_id) { return { inline_keyboard: [[{ text: "✅ APROBAR", callback_data: `aprobar:${telegram_user_id}` }, { text: "❌ DENEGAR", callback_data: `denegar:${telegram_user_id}` }]] }; }
 function shareContactKeyboard() { return { keyboard: [[{ text: "📱 Enviar mi contacto", request_contact: true }]], resize_keyboard: true, is_persistent: true }; }
 function removeKeyboard() { return { remove_keyboard: true }; }
 async function getOrCreateUser(telegram_user_id, username) {
@@ -37,11 +41,33 @@ function msgYaPendiente() { return "✅ Ya tengo tus datos y tu teléfono.\n\nTu
 function msgYaAprobado() { return "✅ Ya estás verificado.\n\nSi aún no tienes acceso al grupo, escribe <b>REVISAR</b>.\n\n(<i>Escribe MENÚ para volver al inicio</i>)"; }
 async function notifyTeachers(user, telegram_user_id, username, tg_name) {
   const text = "📥 <b>ALTA TELEGRAM P44 PENDIENTE</b>\n\n"+`👤 Nombre: ${user.nombre??"-"}\n`+`📧 Email: ${user.email??"-"}\n`+`🎓 Curso: ${user.curso??"-"}\n`+`📱 Teléfono: ${user.telefono??"-"}\n`+`🆔 Telegram ID: ${telegram_user_id}\n`+`🔤 Usuario: ${username?"@"+username:`<a href="tg://user?id=${telegram_user_id}">${tg_name||"Abrir perfil"}</a>`}\n\nEstado: Pendiente de verificación`;
-  await tgSendMessage(process.env.TEACHERS_CHAT_ID,text);
+  await tgSendMessage(process.env.TEACHERS_CHAT_ID,text,verificationKeyboard(telegram_user_id));
 }
 export default async function handler(req,res) {
   if(req.method!=="POST") return res.status(200).send("ok"); const update=req.body;
-  if(update.callback_query){ const cq=update.callback_query; await tgAnswerCallbackQuery(cq.id); const chat_id=cq.message.chat.id, telegram_user_id=cq.from.id, username=cq.from.username??null, data=cq.data; const user=await getOrCreateUser(telegram_user_id,username); if(data==="acceso_grupo"){ if(user.acceso_concedido===true||user.estado==="acceso_aprobado"){await tgSendMessage(chat_id,msgYaAprobado());return res.status(200).json({ok:true});} if(user.telefono&&user.estado==="acceso_pendiente_revision"){await tgSendMessage(chat_id,msgYaPendiente());return res.status(200).json({ok:true});} await updateUser(telegram_user_id,{estado:"acceso_p1"});await tgSendMessage(chat_id,msgPaso1());return res.status(200).json({ok:true});} return res.status(200).json({ok:true}); }
+  if(update.callback_query){
+    const cq=update.callback_query; await tgAnswerCallbackQuery(cq.id); const chat_id=cq.message.chat.id, telegram_user_id=cq.from.id, username=cq.from.username??null, data=cq.data;
+    if(chat_id.toString()===process.env.TEACHERS_CHAT_ID?.toString()&&(data.startsWith("aprobar:")||data.startsWith("denegar:"))){
+      const alumnoId=Number(data.split(":")[1]);
+      if(!Number.isFinite(alumnoId)) return res.status(200).json({ok:true});
+      if(data.startsWith("aprobar:")){
+        const{error}=await supabase.from("telegram_onboarding_p44").update({acceso_concedido:true,estado:"acceso_aprobado",fecha_acceso:new Date().toISOString(),verificado_por:"PROFESOR"}).eq("telegram_user_id",alumnoId);
+        if(error){await tgSendMessage(chat_id,`❌ Error aprobando: ${error.message}`);return res.status(200).json({ok:true});}
+        await tgSendMessage(alumnoId,"✅ Verificación completada. Ya puedes acceder al grupo. Si aún no lo ves, escribe REVISAR.");
+        const nuevoTexto=(cq.message.text||"").replace("Estado: Pendiente de verificación","Estado: ✅ APROBADO");
+        await tgEditMessageText(chat_id,cq.message.message_id,nuevoTexto);
+        return res.status(200).json({ok:true});
+      }
+      const motivo="Los datos no coinciden con el formulario del alumno.";
+      const{error}=await supabase.from("telegram_onboarding_p44").update({acceso_concedido:false,estado:"acceso_denegado",fecha_verificacion:new Date().toISOString(),verificado_por:"PROFESOR",notas:motivo}).eq("telegram_user_id",alumnoId);
+      if(error){await tgSendMessage(chat_id,`❌ Error denegando: ${error.message}`);return res.status(200).json({ok:true});}
+      await tgSendMessage(alumnoId,motivo);
+      const nuevoTexto=(cq.message.text||"").replace("Estado: Pendiente de verificación","Estado: ❌ DENEGADO");
+      await tgEditMessageText(chat_id,cq.message.message_id,nuevoTexto);
+      return res.status(200).json({ok:true});
+    }
+    const user=await getOrCreateUser(telegram_user_id,username);
+    if(data==="acceso_grupo"){ if(user.acceso_concedido===true||user.estado==="acceso_aprobado"){await tgSendMessage(chat_id,msgYaAprobado());return res.status(200).json({ok:true});} if(user.telefono&&user.estado==="acceso_pendiente_revision"){await tgSendMessage(chat_id,msgYaPendiente());return res.status(200).json({ok:true});} await updateUser(telegram_user_id,{estado:"acceso_p1"});await tgSendMessage(chat_id,msgPaso1());return res.status(200).json({ok:true});} return res.status(200).json({ok:true}); }
   if(!update.message) return res.status(200).json({ok:true}); const msg=update.message, chat_id=msg.chat.id, telegram_user_id=msg.from.id, username=msg.from.username??null, first_name=msg.from.first_name??"", last_name=msg.from.last_name??"", tg_name=`${first_name} ${last_name}`.trim(), text=(msg.text??"").trim(); const user=await getOrCreateUser(telegram_user_id,username);
   if(chat_id.toString()!==process.env.TEACHERS_CHAT_ID?.toString()&&text&&(["MENU","MENÚ"].includes(text.toUpperCase())||text==="/start"||text==="/menu")){await updateUser(telegram_user_id,{estado:"menu"});await tgSendMessage(chat_id,msgInicio(),mainMenuKeyboard());return res.status(200).json({ok:true});}
   if(chat_id.toString()===process.env.TEACHERS_CHAT_ID?.toString()){let t=(text||"").trim();const TU=t.toUpperCase();if(TU.startsWith("APROBADO "))t=`APROBAR ${t.split(" ")[1]}`;if(t.toUpperCase().startsWith("APROBAR ")){const alumnoId=Number(t.split(" ")[1]);if(!Number.isFinite(alumnoId)){await tgSendMessage(chat_id,"Formato: APROBAR <telegram_user_id>");return res.status(200).json({ok:true});}const{error}=await supabase.from("telegram_onboarding_p44").update({acceso_concedido:true,estado:"acceso_aprobado",fecha_acceso:new Date().toISOString(),verificado_por:"PROFESOR"}).eq("telegram_user_id",alumnoId);if(error){await tgSendMessage(chat_id,`❌ Error aprobando: ${error.message}`);return res.status(200).json({ok:true});}await tgSendMessage(alumnoId,"✅ Verificación completada. Ya puedes acceder al grupo. Si aún no lo ves, escribe REVISAR.");await tgSendMessage(chat_id,`✅ Aprobado P44: ${alumnoId}`);return res.status(200).json({ok:true});}if(t.toUpperCase().startsWith("DENEGAR ")){const parts=t.split(" "),alumnoId=Number(parts[1]),motivo=parts.slice(2).join(" ").trim()||"No coincide con la matrícula.";if(!Number.isFinite(alumnoId)){await tgSendMessage(chat_id,"Formato: DENEGAR <telegram_user_id> <motivo opcional>");return res.status(200).json({ok:true});}const{error}=await supabase.from("telegram_onboarding_p44").update({acceso_concedido:false,estado:"acceso_denegado",fecha_verificacion:new Date().toISOString(),verificado_por:"PROFESOR",notas:motivo}).eq("telegram_user_id",alumnoId);if(error){await tgSendMessage(chat_id,`❌ Error denegando: ${error.message}`);return res.status(200).json({ok:true});}await tgSendMessage(alumnoId,`❌ Verificación no aprobada: ${motivo}\nSi crees que es un error, escribe REVISAR.`);await tgSendMessage(chat_id,`❌ Denegado P44: ${alumnoId} — ${motivo}`);return res.status(200).json({ok:true});}await tgSendMessage(chat_id,"Comandos P44:\n✅ APROBAR <telegram_user_id>\n❌ DENEGAR <telegram_user_id> <motivo opcional>");return res.status(200).json({ok:true});}
