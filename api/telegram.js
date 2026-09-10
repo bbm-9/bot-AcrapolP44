@@ -19,6 +19,7 @@ async function tgSendMessage(chat_id, text, reply_markup) {
     body: JSON.stringify(payload),
   });
 }
+
 async function tgAnswerCallbackQuery(callback_query_id) {
   await fetch(TG("answerCallbackQuery"), {
     method: "POST",
@@ -26,13 +27,26 @@ async function tgAnswerCallbackQuery(callback_query_id) {
     body: JSON.stringify({ callback_query_id }),
   });
 }
+
 function mainMenuKeyboard() {
   return {
     inline_keyboard: [
-      [{ text: "🎓 Acceder al grupo oficial de la Academia", callback_data: "acceso_grupo" }],
-      [{ text: "❓ Preguntar una duda", callback_data: "preguntar_duda" }],
+      [{ text: "🎓 Acceder al grupo de Telegram P44", callback_data: "acceso_grupo" }],
+      [{ text: "❓ Escribir mensaje a Miguel", url: "https://t.me/Miguel_ACRAPOL" }],
     ],
   };
+}
+
+function shareContactKeyboard() {
+  return {
+    keyboard: [[{ text: "📱 Enviar mi contacto", request_contact: true }]],
+    resize_keyboard: true,
+    is_persistent: true,
+  };
+}
+
+function removeKeyboard() {
+  return { remove_keyboard: true };
 }
 
 async function getOrCreateUser(telegram_user_id, username) {
@@ -64,7 +78,6 @@ async function updateUser(telegram_user_id, patch) {
 }
 
 function isValidLinePaso2(text) {
-  // "Nombre Apellidos | email@... | Curso"
   if (!text.includes("|")) return false;
   const parts = text.split("|").map((s) => s.trim());
   if (parts.length < 3) return false;
@@ -81,64 +94,101 @@ function msgInicio() {
   return (
     "👋 Bienvenido a <b>ACRAPOL</b>, la academia que eligen los mejores.\n\n" +
     "Selecciona una opción:\n\n" +
-    "Puedes escribir <b>MENU</b> en cualquier momento para volver al inicio."
+    "Puedes escribir <b>MENÚ</b> en cualquier momento para volver al inicio."
   );
 }
 
 function msgPaso1() {
   return (
-    "Paso 1/4 ✅\n\n" +
-    "Solicita acceso al grupo desde el campus → apartado <b>“Grupo Telegram”</b>.\n\n" +
-    "Cuando lo hayas hecho, escribe: <b>HECHO</b>\n\n" +
+    "Paso 1/5 ✅\n\n" +
+    "Dentro del curso <b><u>debes</u></b> realizar estas acciones:\n\n" +
+    "1️⃣ Rellenar el <b>FORMULARIO DEL ALUMNO</b> con datos veraces\n" +
+    "2️⃣ Aceptar las <b>CONDICIONES Y NORMAS DE USO</b>\n" +
+    "3️⃣ Lectura obligatoria del PDF <b>EXPLICACIÓN Y DESARROLLO DEL CURSO</b>\n\n" +
+    "Cuando lo hayas hecho todo, escribe: <b>HECHO</b>\n\n" +
     "(<i>Escribe MENU para volver al inicio</i>)"
   );
 }
 
 function msgPaso2() {
   return (
-    "Paso 2/4 ✅\n\n" +
-    "Envíame en una sola línea (copia, pega y sustituye datos):\n\n" +
-    "<b>Nombre y apellidos | Email con el que te has matriculado | Curso (Total43, Pack 3 Módulos, Intensivo)</b>\n\n" +
-    "Ejemplo:\nMiguel García Fernández | miguel.acrapol@acrapol.com | Curso Total43\n\n" +
+    "Paso 2/5 ✅\n\n" +
+    "Solicita el acceso al grupo desde el Campus:\n\n" +
+    "1️⃣ Apartado <b>INICIO</b> dentro del Módulo/Curso <b> → “Solicitar acceso | Grupo TELEGRAM P44”</b>;\n\n" +
+    "2️⃣ Se te abrirá la web o app de Telegram → Unirse al grupo o <i>Join group</i>.\n\n" +
+    "Cuando lo hayas hecho, escribe: <b>HECHO</b>\n\n" +
     "(<i>Escribe MENU para volver al inicio</i>)"
   );
 }
 
 function msgPaso3() {
   return (
-    "Paso 3/4 (verificación obligatoria) 📱\n\n" +
-    "Necesito tu número de teléfono visible en Telegram para comprobar que coincide con tu matrícula.\n\n" +
-    "Hazlo así (30 segundos):\n" +
-    "1️⃣ Telegram → Ajustes\n" +
-    "2️⃣ Privacidad y seguridad\n" +
-    "3️⃣ Número de teléfono\n" +
-    "4️⃣ En “¿Quién puede ver mi número?” selecciona <b>Mis contactos</b> o <b>Todos</b>\n" +
-    "5️⃣ Vuelve aquí y pulsa: 📎 Adjuntar → Contacto → <b>Enviar mi contacto</b>\n\n" +
-    "Cuando lo envíes correctamente te marcaré ✅\n\n" +
+    "Paso 3/5 ✅\n\n" +
+    "Envíame en una sola línea:\n\n" +
+    "<b>Nombre y apellidos | Email con el que te has matriculado | Curso (Total43, Pack 3 Módulos, Intensivo)</b>\n\n" +
+    "Ejemplo:\nMiguel García Fernández | miguel.acrapol@acrapol.es | Curso Total43\n\n" +
     "(<i>Escribe MENU para volver al inicio</i>)"
   );
 }
 
 function msgPaso4() {
   return (
-    "Paso 4/4 ✅\n\n" +
+    "Paso 4/5 (verificación obligatoria) 📱\n\n" +
+    "Antes de enviarme tu contacto, configura tu teléfono como <b>VISIBLE PARA TODOS</b>:\n\n" +
+    "1️⃣ Telegram → Ajustes\n" +
+    "2️⃣ Privacidad y seguridad\n" +
+    "3️⃣ Número de teléfono\n" +
+    "4️⃣ En “¿Quién puede ver mi número?” selecciona <b>TODOS</b>\n\n" +
+    "✅ Cuando esté en <b>TODOS</b>, vuelve aquí y pulsa el botón:\n" +
+    "<b>📱 Enviar mi contacto</b>\n\n" +
+    "Si no ves el botón, pulsa el icono del <b>teclado</b> abajo en Telegram.\n\n" +
+    "❌ <b>NO</b> uses el clip 📎 → Contacto (abre la agenda y permite enviar otro contacto).\n\n" +
+    "Cuando lo envíes correctamente te marcaré ✅\n\n" +
+    "(<i>Escribe MENU para volver al inicio</i>)"
+  );
+}
+
+function msgPaso5() {
+  return (
+    "Paso 5/5 ✅\n\n" +
     "Datos recibidos correctamente.\n\n" +
-    "Un profesor verificará la información y te dará acceso al grupo.\n" +
+    "Miguel verificará la información y te dará acceso al grupo.\n" +
     "⏳ Tiempo habitual: menos de 24h.\n\n" +
     "Si pasado ese tiempo no tienes acceso, escribe: <b>REVISAR</b>\n\n" +
     "(<i>Escribe MENU para volver al inicio</i>)"
   );
 }
 
-async function notifyTeachers(user, telegram_user_id, username) {
+function msgYaPendiente() {
+  return (
+    "✅ Ya tengo tus datos y tu teléfono.\n\n" +
+    "Tu solicitud está <b>pendiente de revisión</b> por un profesor.\n" +
+    "Si han pasado 24h, escribe <b>REVISAR</b>.\n\n" +
+    "(<i>Escribe MENU para volver al inicio</i>)"
+  );
+}
+
+function msgYaAprobado() {
+  return (
+    "✅ Ya estás verificado.\n\n" +
+    "Si aún no tienes acceso al grupo, escribe <b>REVISAR</b>.\n\n" +
+    "(<i>Escribe MENU para volver al inicio</i>)"
+  );
+}
+
+async function notifyTeachers(user, telegram_user_id, username, tg_name) {
   const text =
-    "📥 <b>ALTA TELEGRAM PENDIENTE</b>\n\n" +
+    "📥 <b>ALTA TELEGRAM P44 PENDIENTE</b>\n\n" +
     `👤 Nombre: ${user.nombre ?? "-"}\n` +
     `📧 Email: ${user.email ?? "-"}\n` +
     `🎓 Curso: ${user.curso ?? "-"}\n` +
     `📱 Teléfono: ${user.telefono ?? "-"}\n` +
     `🆔 Telegram ID: ${telegram_user_id}\n` +
-    `🔤 Usuario: ${username ? "@" + username : "-"}\n\n` +
+    `🔤 Usuario: ${
+      username
+        ? "@" + username
+        : `<a href="tg://user?id=${telegram_user_id}">${tg_name || "Abrir perfil"}</a>`
+    }\n\n` +
     "Estado: Pendiente de verificación";
 
   await tgSendMessage(process.env.TEACHERS_CHAT_ID, text);
@@ -149,10 +199,10 @@ export default async function handler(req, res) {
 
   const update = req.body;
 
-  // Callback de botones
   if (update.callback_query) {
     const cq = update.callback_query;
     await tgAnswerCallbackQuery(cq.id);
+
     const chat_id = cq.message.chat.id;
     const telegram_user_id = cq.from.id;
     const username = cq.from.username ?? null;
@@ -161,56 +211,147 @@ export default async function handler(req, res) {
     const user = await getOrCreateUser(telegram_user_id, username);
 
     if (data === "acceso_grupo") {
+      if (user.acceso_concedido === true || user.estado === "acceso_aprobado") {
+        await tgSendMessage(chat_id, msgYaAprobado());
+        return res.status(200).json({ ok: true });
+      }
+
+      if (user.telefono && user.estado === "acceso_pendiente_revision") {
+        await tgSendMessage(chat_id, msgYaPendiente());
+        return res.status(200).json({ ok: true });
+      }
+
       await updateUser(telegram_user_id, { estado: "acceso_p1" });
       await tgSendMessage(chat_id, msgPaso1());
-    }
-
-    if (data === "preguntar_duda") {
-      await updateUser(telegram_user_id, { estado: "duda_pendiente" });
-      await tgSendMessage(
-        chat_id,
-        "Escribe tu duda en un único mensaje.\nSi puedes, indica:\n📚 Tema\n❓ Pregunta concreta\n\nCuando la envíes, la recibirá un profesor.\n\n(<i>Escribe MENU para volver al inicio</i>)"
-      );
+      return res.status(200).json({ ok: true });
     }
 
     return res.status(200).json({ ok: true });
   }
 
-  // Mensajes normales
   if (!update.message) return res.status(200).json({ ok: true });
 
   const msg = update.message;
   const chat_id = msg.chat.id;
   const telegram_user_id = msg.from.id;
   const username = msg.from.username ?? null;
-
+  const first_name = msg.from.first_name ?? "";
+  const last_name = msg.from.last_name ?? "";
+  const tg_name = `${first_name} ${last_name}`.trim();
   const text = (msg.text ?? "").trim();
 
   const user = await getOrCreateUser(telegram_user_id, username);
 
-  // Comandos universales
-  if (text.toUpperCase() === "MENU" || text === "/start" || text === "/menu") {
+  if (
+    chat_id.toString() !== process.env.TEACHERS_CHAT_ID?.toString() &&
+    text &&
+    (text.toUpperCase() === "MENU" || text === "/start" || text === "/menu")
+  ) {
     await updateUser(telegram_user_id, { estado: "menu" });
     await tgSendMessage(chat_id, msgInicio(), mainMenuKeyboard());
     return res.status(200).json({ ok: true });
   }
 
-  // Flujo DUDAS: reenviar al grupo interno
-  if (user.estado === "duda_pendiente") {
-    const duda =
-      "❓ <b>DUDA ALUMNO</b>\n\n" +
+  if (chat_id.toString() === process.env.TEACHERS_CHAT_ID?.toString()) {
+    let t = (text || "").trim();
+
+    const TU = t.toUpperCase();
+    if (TU.startsWith("APROBADO ")) {
+      const id = t.split(" ")[1];
+      t = `APROBAR ${id}`;
+    }
+
+    if (t.toUpperCase().startsWith("APROBAR ")) {
+      const alumnoId = Number(t.split(" ")[1]);
+
+      if (!Number.isFinite(alumnoId)) {
+        await tgSendMessage(chat_id, "Formato: APROBAR <telegram_user_id>");
+        return res.status(200).json({ ok: true });
+      }
+
+      const { error } = await supabase
+        .from("telegram_onboarding_p44")
+        .update({
+          acceso_concedido: true,
+          estado: "acceso_aprobado",
+          fecha_acceso: new Date().toISOString(),
+          verificado_por: "PROFESOR",
+        })
+        .eq("telegram_user_id", alumnoId);
+
+      if (error) {
+        await tgSendMessage(chat_id, `❌ Error aprobando: ${error.message}`);
+        return res.status(200).json({ ok: true });
+      }
+
+      await tgSendMessage(
+        alumnoId,
+        "✅ Verificación completada. Ya puedes acceder al grupo. Si aún no lo ves, escribe REVISAR."
+      );
+
+      await tgSendMessage(chat_id, `✅ Aprobado P44: ${alumnoId}`);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (t.toUpperCase().startsWith("DENEGAR ")) {
+      const parts = t.split(" ");
+      const alumnoId = Number(parts[1]);
+      const motivo = parts.slice(2).join(" ").trim() || "No coincide con la matrícula.";
+
+      if (!Number.isFinite(alumnoId)) {
+        await tgSendMessage(chat_id, "Formato: DENEGAR <telegram_user_id> <motivo opcional>");
+        return res.status(200).json({ ok: true });
+      }
+
+      const { error } = await supabase
+        .from("telegram_onboarding_p44")
+        .update({
+          acceso_concedido: false,
+          estado: "acceso_denegado",
+          fecha_verificacion: new Date().toISOString(),
+          verificado_por: "PROFESOR",
+          notas: motivo,
+        })
+        .eq("telegram_user_id", alumnoId);
+
+      if (error) {
+        await tgSendMessage(chat_id, `❌ Error denegando: ${error.message}`);
+        return res.status(200).json({ ok: true });
+      }
+
+      await tgSendMessage(
+        alumnoId,
+        `❌ Verificación no aprobada: ${motivo}\nSi crees que es un error, escribe REVISAR.`
+      );
+
+      await tgSendMessage(chat_id, `❌ Denegado P44: ${alumnoId} — ${motivo}`);
+      return res.status(200).json({ ok: true });
+    }
+
+    await tgSendMessage(
+      chat_id,
+      "Comandos P44:\n✅ APROBAR <telegram_user_id>\n❌ DENEGAR <telegram_user_id> <motivo opcional>"
+    );
+    return res.status(200).json({ ok: true });
+  }
+
+  if (
+    chat_id.toString() !== process.env.TEACHERS_CHAT_ID?.toString() &&
+    (text.toUpperCase() === "REVISAR" || text === "/revisar")
+  ) {
+    const aviso =
+      "🔔 <b>REVISAR ACCESO P44</b>\n\n" +
       `🆔 Telegram ID: ${telegram_user_id}\n` +
-      `🔤 Usuario: ${username ? "@" + username : "-"}\n\n` +
-      `📝 Mensaje:\n${text}`;
+      `🔤 Usuario: ${username ? "@" + username : "-"}\n` +
+      `📱 Teléfono: ${user.telefono ?? "-"}\n` +
+      `📧 Email: ${user.email ?? "-"}\n` +
+      `🎓 Curso: ${user.curso ?? "-"}\n`;
 
-    await tgSendMessage(process.env.TEACHERS_CHAT_ID, duda);
-    await tgSendMessage(chat_id, "Recibido ✅ Te responderá un profesor.");
-    await updateUser(telegram_user_id, { estado: "menu" });
-    await tgSendMessage(chat_id, msgInicio(), mainMenuKeyboard());
+    await tgSendMessage(process.env.TEACHERS_CHAT_ID, aviso);
+    await tgSendMessage(chat_id, "Perfecto ✅ He avisado al profesor para que revise tu acceso.");
     return res.status(200).json({ ok: true });
   }
 
-  // Flujo ACCESO
   if (user.estado === "acceso_p1") {
     if (text.toUpperCase() === "HECHO") {
       await updateUser(telegram_user_id, { estado: "acceso_p2" });
@@ -222,38 +363,65 @@ export default async function handler(req, res) {
   }
 
   if (user.estado === "acceso_p2") {
-    if (!isValidLinePaso2(text)) {
-      await tgSendMessage(chat_id, "Formato incorrecto. Ejemplo:\nJuan Pérez García | juan@email.com | Curso Básica");
-      return res.status(200).json({ ok: true });
+    if (text.toUpperCase() === "HECHO") {
+      await updateUser(telegram_user_id, { estado: "acceso_p3" });
+      await tgSendMessage(chat_id, msgPaso3());
+    } else {
+      await tgSendMessage(chat_id, "Cuando lo hayas hecho, escribe <b>HECHO</b>.");
     }
-
-    const { nombre, email, curso } = extractPaso2(text);
-    await updateUser(telegram_user_id, { nombre, email, curso, estado: "acceso_p3" });
-    await tgSendMessage(chat_id, msgPaso3());
     return res.status(200).json({ ok: true });
   }
 
   if (user.estado === "acceso_p3") {
-    // Aquí exigimos CONTACTO. Si escribe texto, le insistimos.
+    if (!isValidLinePaso2(text)) {
+      await tgSendMessage(
+        chat_id,
+        "Formato incorrecto. Ejemplo:\nMiguel García Fernández | miguel.acrapol@acrapol.es | Curso Total43"
+      );
+      return res.status(200).json({ ok: true });
+    }
+
+    const { nombre, email, curso } = extractPaso2(text);
+    await updateUser(telegram_user_id, { nombre, email, curso, estado: "acceso_p4" });
+    await tgSendMessage(chat_id, msgPaso4(), shareContactKeyboard());
+    return res.status(200).json({ ok: true });
+  }
+
+  if (user.estado === "acceso_p4") {
+    if (msg.contact && msg.contact.phone_number) {
+      if (!msg.contact.user_id || msg.contact.user_id !== telegram_user_id) {
+        await tgSendMessage(
+          chat_id,
+          "❌ Ese no es tu contacto.\nPulsa <b>📱 Enviar mi contacto</b> (no vale enviar un contacto desde la agenda).",
+          shareContactKeyboard()
+        );
+        return res.status(200).json({ ok: true });
+      }
+
+      await updateUser(telegram_user_id, {
+        telefono: msg.contact.phone_number,
+        estado: "acceso_pendiente_revision",
+      });
+
+      const refreshed = await getOrCreateUser(telegram_user_id, username);
+
+      await tgSendMessage(chat_id, "Contacto recibido ✅", removeKeyboard());
+      await tgSendMessage(chat_id, msgPaso5());
+      await notifyTeachers(refreshed, telegram_user_id, username, tg_name);
+
+      return res.status(200).json({ ok: true });
+    }
+
     await tgSendMessage(
       chat_id,
-      "Necesito que lo envíes como <b>Contacto</b>, no escrito en texto.\nPulsa 📎 → Contacto → <b>Enviar mi contacto</b>."
+      "Pulsa <b>📱 Enviar mi contacto</b> (y asegúrate de tener “¿Quién puede ver mi número?” en <b>TODOS</b>).
+
+",
+      shareContactKeyboard()
     );
     return res.status(200).json({ ok: true });
   }
 
-  // Si el usuario envía un contacto (NO es texto)
-  if (msg.contact && (user.estado === "acceso_p3" || user.estado === "acceso_p3_ok")) {
-    const phone = msg.contact.phone_number;
-    await updateUser(telegram_user_id, { telefono: phone, estado: "acceso_pendiente_revision" });
-    const refreshed = await getOrCreateUser(telegram_user_id, username);
-    await tgSendMessage(chat_id, "Contacto recibido ✅");
-    await tgSendMessage(chat_id, msgPaso4());
-    await notifyTeachers(refreshed, telegram_user_id, username);
-    return res.status(200).json({ ok: true });
-  }
-
-  // Default: si no está en flujo, re-muestra menú
   await tgSendMessage(chat_id, msgInicio(), mainMenuKeyboard());
   return res.status(200).json({ ok: true });
 }
