@@ -37,6 +37,7 @@ function mainMenuKeyboard() {
   };
 }
 
+// ✅ Botón obligatorio para compartir MI contacto (cierra la brecha)
 function shareContactKeyboard() {
   return {
     keyboard: [[{ text: "📱 Enviar mi contacto", request_contact: true }]],
@@ -78,6 +79,7 @@ async function updateUser(telegram_user_id, patch) {
 }
 
 function isValidLinePaso2(text) {
+  // "Nombre Apellidos | email@... | Curso"
   if (!text.includes("|")) return false;
   const parts = text.split("|").map((s) => s.trim());
   if (parts.length < 3) return false;
@@ -131,6 +133,7 @@ function msgPaso3() {
   );
 }
 
+// ✅ Paso 4 con TODOS + botón obligatorio + frase ✅ + vuelta a menú
 function msgPaso4() {
   return (
     "Paso 4/5 (verificación obligatoria) 📱\n\n" +
@@ -199,6 +202,7 @@ export default async function handler(req, res) {
 
   const update = req.body;
 
+  // ✅ Callback de botones
   if (update.callback_query) {
     const cq = update.callback_query;
     await tgAnswerCallbackQuery(cq.id);
@@ -211,16 +215,19 @@ export default async function handler(req, res) {
     const user = await getOrCreateUser(telegram_user_id, username);
 
     if (data === "acceso_grupo") {
+      // ✅ Si ya está aprobado/concedido, no repetir proceso
       if (user.acceso_concedido === true || user.estado === "acceso_aprobado") {
         await tgSendMessage(chat_id, msgYaAprobado());
         return res.status(200).json({ ok: true });
       }
 
+      // ✅ Si ya envió teléfono y está pendiente, no repetir proceso
       if (user.telefono && user.estado === "acceso_pendiente_revision") {
         await tgSendMessage(chat_id, msgYaPendiente());
         return res.status(200).json({ ok: true });
       }
 
+      // 🔁 Flujo normal
       await updateUser(telegram_user_id, { estado: "acceso_p1" });
       await tgSendMessage(chat_id, msgPaso1());
       return res.status(200).json({ ok: true });
@@ -229,6 +236,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ✅ Mensajes normales
   if (!update.message) return res.status(200).json({ ok: true });
 
   const msg = update.message;
@@ -242,6 +250,7 @@ export default async function handler(req, res) {
 
   const user = await getOrCreateUser(telegram_user_id, username);
 
+  // ✅ Comando universal: MENU (NO aplica en grupo interno)
   if (
     chat_id.toString() !== process.env.TEACHERS_CHAT_ID?.toString() &&
     text &&
@@ -252,15 +261,18 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ✅ Comandos de profesor SOLO desde el grupo interno
   if (chat_id.toString() === process.env.TEACHERS_CHAT_ID?.toString()) {
     let t = (text || "").trim();
 
+    // Alias: APROBADO <id> -> APROBAR <id>
     const TU = t.toUpperCase();
     if (TU.startsWith("APROBADO ")) {
       const id = t.split(" ")[1];
       t = `APROBAR ${id}`;
     }
 
+    // Formato: APROBAR <telegram_user_id>
     if (t.toUpperCase().startsWith("APROBAR ")) {
       const alumnoId = Number(t.split(" ")[1]);
 
@@ -293,6 +305,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    // Formato: DENEGAR <telegram_user_id> <motivo opcional...>
     if (t.toUpperCase().startsWith("DENEGAR ")) {
       const parts = t.split(" ");
       const alumnoId = Number(parts[1]);
@@ -328,6 +341,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    // Fallback comandos profe
     await tgSendMessage(
       chat_id,
       "Comandos P44:\n✅ APROBAR <telegram_user_id>\n❌ DENEGAR <telegram_user_id> <motivo opcional>"
@@ -335,6 +349,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ✅ Comando universal: REVISAR (NO aplica en grupo interno)
   if (
     chat_id.toString() !== process.env.TEACHERS_CHAT_ID?.toString() &&
     (text.toUpperCase() === "REVISAR" || text === "/revisar")
@@ -352,6 +367,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // PASO 1/5
   if (user.estado === "acceso_p1") {
     if (text.toUpperCase() === "HECHO") {
       await updateUser(telegram_user_id, { estado: "acceso_p2" });
@@ -362,6 +378,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // PASO 2/5
   if (user.estado === "acceso_p2") {
     if (text.toUpperCase() === "HECHO") {
       await updateUser(telegram_user_id, { estado: "acceso_p3" });
@@ -372,6 +389,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // PASO 3/5
   if (user.estado === "acceso_p3") {
     if (!isValidLinePaso2(text)) {
       await tgSendMessage(
@@ -383,12 +401,16 @@ export default async function handler(req, res) {
 
     const { nombre, email, curso } = extractPaso2(text);
     await updateUser(telegram_user_id, { nombre, email, curso, estado: "acceso_p4" });
+
+    // ✅ Aquí mandamos Paso 4 con el botón obligatorio
     await tgSendMessage(chat_id, msgPaso4(), shareContactKeyboard());
     return res.status(200).json({ ok: true });
   }
 
+  // PASO 4/5 (contacto)
   if (user.estado === "acceso_p4") {
     if (msg.contact && msg.contact.phone_number) {
+      // 🔒 Validación crítica: solo aceptamos "MI contacto"
       if (!msg.contact.user_id || msg.contact.user_id !== telegram_user_id) {
         await tgSendMessage(
           chat_id,
@@ -412,6 +434,16 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    // Si NO es contacto, insistimos con el botón
     await tgSendMessage(
       chat_id,
       "Pulsa <b>📱 Enviar mi contacto</b> (y asegúrate de tener “¿Quién puede ver mi número?” en <b>TODOS</b>).",
+      shareContactKeyboard()
+    );
+    return res.status(200).json({ ok: true });
+  }
+
+  // Default: si no está en flujo, re-muestra menú
+  await tgSendMessage(chat_id, msgInicio(), mainMenuKeyboard());
+  return res.status(200).json({ ok: true });
+}
