@@ -102,9 +102,9 @@ function msgPaso1() {
   return (
     "Paso 1/5 ✅\n\n" +
     "Dentro del curso <b><u>debes</u></b> realizar estas acciones:\n\n" +
-    "1️⃣ Rellenar el <b>FORMULARIO DEL ALUMNO</b> con datos veraces\n" +
-    "2️⃣ Aceptar las <b>CONDICIONES Y NORMAS DE USO</b>\n" +
-    "3️⃣ Lectura obligatoria del PDF <b>EXPLICACIÓN Y DESARROLLO DEL CURSO</b>\n\n" +
+    "1️⃣ Lectura obligatoria del PDF <b>EXPLICACIÓN DEL CURSO</b>\n" +
+    "2️⃣ Rellenar el <b>FORMULARIO DEL ALUMNO</b> con datos veraces\n" +
+    "3️⃣ Aceptar las <b>CONDICIONES Y NORMAS DE USO</b>\n\n" +
     "Cuando lo hayas hecho todo, escribe: <b>HECHO</b>\n\n" +
     "(<i>Escribe MENU para volver al inicio</i>)"
   );
@@ -113,7 +113,7 @@ function msgPaso1() {
 function msgPaso2() {
   return (
     "Paso 2/5 ✅\n\n" +
-    "Solicita el acceso al grupo desde el Campus, ¡OJO! recomendamos hacer este paso con tu teléfono móvil:\n\n" +
+    "Solicita el acceso al grupo desde el Campus, <b>¡OJO!</b> recomendamos hacer este paso con tu teléfono móvil:\n\n" +
     "1️⃣ Apartado <b>INICIO</b> dentro del Módulo/Curso <b> → “Solicitud de acceso al Grupo P44”</b>;\n\n" +
     "2️⃣ Se te abrirá la web o app de Telegram → Unirse al grupo o <i>Join group</i>.\n\n" +
     "Cuando lo hayas hecho, escribe: <b>HECHO</b>\n\n" +
