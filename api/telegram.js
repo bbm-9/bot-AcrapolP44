@@ -126,11 +126,11 @@ function msgPaso3() {
     "Paso 3/5 ✅\n\n" +
     "Envíame tus datos en <b>3 líneas</b>, de esta forma:\n\n" +
     "<b>Nombre y apellidos</b>\n" +
-    "<b>Correo con el que te has matriculado (el mismo del formulario del alumno)</b>\n" +
+    "<b>Correo con el que te has matriculado</b>\n" +
     "<b>Curso (Total44, Pack 3 Módulos, Intensivo)</b>\n\n" +
     "Ejemplo:\n" +
     "Miguel García Fernández\n" +
-    "miguel.acrapol@acrapol.es\n" +
+    "miguel@acrapol.es\n" +
     "Total44\n\n" +
     "(<i>Escribe MENU para volver al inicio</i>)"
   );
