@@ -45,6 +45,21 @@ async function notifyTeachers(user, telegram_user_id, username, tg_name) {
 }
 export default async function handler(req,res) {
   if(req.method!=="POST") return res.status(200).send("ok"); const update=req.body;
+  // Registrar solicitudes de entrada al grupo P44 sin aprobarlas todavía.
+  if(update.chat_join_request) {
+    const solicitud = update.chat_join_request;
+    if(String(solicitud.chat?.id) !== String(process.env.TELEGRAM_GROUP_ID)) {
+      return res.status(200).json({ok:true});
+    }
+    const alumnoId = solicitud.from?.id;
+    if(!alumnoId) return res.status(200).json({ok:true});
+    await getOrCreateUser(alumnoId, solicitud.from.username ?? null);
+    await updateUser(alumnoId, {
+      solicitud_grupo_pendiente: true,
+      fecha_solicitud_grupo: new Date(solicitud.date * 1000).toISOString()
+    });
+    return res.status(200).json({ok:true});
+  }
   // Ignorar mensajes y botones del grupo de alumnos P44; las solicitudes de acceso se gestionarán aparte.
   const groupId = process.env.TELEGRAM_GROUP_ID;
   if(groupId && (String(update.message?.chat?.id) === groupId || String(update.callback_query?.message?.chat?.id) === groupId)) {
