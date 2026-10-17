@@ -43,6 +43,28 @@ async function notifyTeachers(user, telegram_user_id, username, tg_name) {
   const text = "📥 <b>ALTA TELEGRAM P44 PENDIENTE</b>\n\n"+`👤 Nombre: ${user.nombre??"-"}\n`+`📧 Email: ${user.email??"-"}\n`+`🎓 Curso: ${user.curso??"-"}\n`+`📱 Teléfono: ${user.telefono??"-"}\n`+`🆔 Telegram ID: ${telegram_user_id}\n`+`🔤 Usuario: ${username?"@"+username:`<a href="tg://user?id=${telegram_user_id}">${tg_name||"Abrir perfil"}</a>`}\n\nEstado: Pendiente de verificación`;
   await tgSendMessage(process.env.TEACHERS_CHAT_ID,text,verificationKeyboard(telegram_user_id));
 }
+
+const avisoSinSolicitud = "¡Hola! 👋\n\nAunque en el Asistente Virtual te indicamos que tienes todos los pasos completados, <b>NO has realizado correctamente la solicitud de acceso al Grupo P44 (paso 2)</b>.\n\nPara que podamos aceptarte en el grupo, sigue estos pasos:\n\n<b>⚠️ MUY IMPORTANTE: hazlo con el móvil 📱</b>\n\n1️⃣ Accede al Campus de ACRAPOL y entra en el <b>Módulo 1</b>.\n\n2️⃣ Ve al apartado <b>INICIO (la casita)</b> y pincha en el enlace denominado <b>«Solicitud de acceso al Grupo P44»</b>.\n\n3️⃣ Se te abrirá la aplicación de Telegram. Pulsa <b>«Solicitar unirme al grupo»</b>.\n\nCuando completes los tres pasos correctamente, escribe: <b>HECHO</b>.\n\nUn saludo.";
+
+async function intentarAdmision(alumnoId) {
+  const response = await fetch(TG("approveChatJoinRequest"), {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ chat_id: process.env.TELEGRAM_GROUP_ID, user_id: alumnoId })
+  });
+  const result = await response.json();
+  if(result.ok) {
+    await updateUser(alumnoId, {
+      acceso_concedido: true, estado: "acceso_aprobado",
+      solicitud_grupo_pendiente: false, fecha_acceso: new Date().toISOString(),
+      fecha_admision_grupo: new Date().toISOString()
+    });
+    return "aprobado";
+  }
+  const description = String(result.description || "");
+  if(result.error_code === 400 && /request|join|missing|not found/i.test(description)) return "sin_solicitud";
+  throw new Error("Telegram no pudo aprobar la solicitud: " + description);
+}
+
 export default async function handler(req,res) {
   if(req.method!=="POST") return res.status(200).send("ok"); const update=req.body;
   // Registrar solicitudes de entrada al grupo P44 sin aprobarlas todavía.
@@ -58,6 +80,14 @@ export default async function handler(req,res) {
       solicitud_grupo_pendiente: true,
       fecha_solicitud_grupo: new Date(solicitud.date * 1000).toISOString()
     });
+    const {data: alumno} = await supabase.from("telegram_onboarding_p44").select("estado").eq("telegram_user_id",alumnoId).maybeSingle();
+    if(alumno?.estado === "acceso_pendiente_de_solicitud") {
+      try {
+        if(await intentarAdmision(alumnoId) === "aprobado") {
+          await tgSendMessage(alumnoId,"✅ <b>Verificación completada</b>. Ya tienes acceso al grupo. ¡Un saludo! 👋");
+        }
+      } catch(error) { console.error("Error aprobando solicitud posterior:",error); }
+    }
     return res.status(200).json({ok:true});
   }
   // Ignorar mensajes y botones del grupo de alumnos P44; las solicitudes de acceso se gestionarán aparte.
@@ -72,11 +102,24 @@ export default async function handler(req,res) {
       const alumnoId=Number(data.split(":")[1]);
       if(!Number.isFinite(alumnoId)) return res.status(200).json({ok:true});
       if(data.startsWith("aprobar:")){
-        const{error}=await supabase.from("telegram_onboarding_p44").update({acceso_concedido:true,estado:"acceso_aprobado",fecha_acceso:new Date().toISOString(),verificado_por:"PROFESOR"}).eq("telegram_user_id",alumnoId);
-        if(error){await tgSendMessage(chat_id,`❌ Error aprobando: ${error.message}`);return res.status(200).json({ok:true});}
-        await tgSendMessage(alumnoId,"✅ <b>Verificación completada</b>. Ya tienes acceso al grupo. ¡Un saludo! 👋");
-        const nuevoTexto=(cq.message.text||"").replace("Estado: Pendiente de verificación","Estado: ✅ APROBADO");
-        await tgEditMessageText(chat_id,cq.message.message_id,nuevoTexto);
+        const {data: alumno, error: lookupError} = await supabase.from("telegram_onboarding_p44").select("estado").eq("telegram_user_id",alumnoId).maybeSingle();
+        if(lookupError || !alumno){await tgSendMessage(chat_id,"❌ No se encontró al alumno.");return res.status(200).json({ok:true});}
+        if(alumno.estado === "acceso_aprobado" || alumno.estado === "acceso_pendiente_de_solicitud") return res.status(200).json({ok:true});
+        try {
+          const resultado = await intentarAdmision(alumnoId);
+          if(resultado === "aprobado") {
+            await updateUser(alumnoId,{verificado_por:"PROFESOR",fecha_verificacion:new Date().toISOString()});
+            await tgSendMessage(alumnoId,"✅ <b>Verificación completada</b>. Ya tienes acceso al grupo. ¡Un saludo! 👋");
+            await tgEditMessageText(chat_id,cq.message.message_id,(cq.message.text||"").replace("Estado: Pendiente de verificación","Estado: ✅ APROBADO"));
+          } else {
+            await updateUser(alumnoId,{estado:"acceso_pendiente_de_solicitud",acceso_concedido:false,verificado_por:"PROFESOR",fecha_verificacion:new Date().toISOString(),solicitud_grupo_pendiente:false});
+            await tgSendMessage(alumnoId,avisoSinSolicitud);
+            await tgEditMessageText(chat_id,cq.message.message_id,(cq.message.text||"").replace("Estado: Pendiente de verificación","Estado: ⚠️ DATOS VERIFICADOS — FALTA SOLICITUD"));
+          }
+        } catch(error) {
+          console.error("Error aprobando entrada:",error);
+          await tgSendMessage(chat_id,"⚠️ No se pudo tramitar la entrada de "+alumnoId+". Revisa los permisos del bot y vuelve a intentarlo.");
+        }
         return res.status(200).json({ok:true});
       }
       const motivo="❌ <b>Acceso denegado</b>. Los datos aportados no coinciden con el formulario del alumno. Escribe a Miguel para solucionarlo. ¡Un saludo! 👋";
@@ -97,6 +140,19 @@ export default async function handler(req,res) {
   if(chat_id.toString()!==process.env.TEACHERS_CHAT_ID?.toString()&&text&&(["MENU","MENÚ"].includes(text.toUpperCase())||text==="/start"||text==="/menu")){await updateUser(telegram_user_id,{estado:"menu"});await tgSendMessage(chat_id,msgInicio(),mainMenuKeyboard());return res.status(200).json({ok:true});}
   if(chat_id.toString()===process.env.TEACHERS_CHAT_ID?.toString()){let t=(text||"").trim();const TU=t.toUpperCase();if(TU.startsWith("APROBADO "))t=`APROBAR ${t.split(" ")[1]}`;if(t.toUpperCase().startsWith("APROBAR ")){const alumnoId=Number(t.split(" ")[1]);if(!Number.isFinite(alumnoId)){await tgSendMessage(chat_id,"Formato: APROBAR <telegram_user_id>");return res.status(200).json({ok:true});}const{error}=await supabase.from("telegram_onboarding_p44").update({acceso_concedido:true,estado:"acceso_aprobado",fecha_acceso:new Date().toISOString(),verificado_por:"PROFESOR"}).eq("telegram_user_id",alumnoId);if(error){await tgSendMessage(chat_id,`❌ Error aprobando: ${error.message}`);return res.status(200).json({ok:true});}await tgSendMessage(alumnoId,"✅ Verificación completada. Ya puedes acceder al grupo. Si aún no lo ves, escribe REVISAR.");await tgSendMessage(chat_id,`✅ Aprobado P44: ${alumnoId}`);return res.status(200).json({ok:true});}if(t.toUpperCase().startsWith("DENEGAR ")){const parts=t.split(" "),alumnoId=Number(parts[1]),motivo=parts.slice(2).join(" ").trim()||"No coincide con la matrícula.";if(!Number.isFinite(alumnoId)){await tgSendMessage(chat_id,"Formato: DENEGAR <telegram_user_id> <motivo opcional>");return res.status(200).json({ok:true});}const{error}=await supabase.from("telegram_onboarding_p44").update({acceso_concedido:false,estado:"acceso_denegado",fecha_verificacion:new Date().toISOString(),verificado_por:"PROFESOR",notas:motivo}).eq("telegram_user_id",alumnoId);if(error){await tgSendMessage(chat_id,`❌ Error denegando: ${error.message}`);return res.status(200).json({ok:true});}await tgSendMessage(alumnoId,`❌ Verificación no aprobada: ${motivo}\nSi crees que es un error, escribe REVISAR.`);await tgSendMessage(chat_id,`❌ Denegado P44: ${alumnoId} — ${motivo}`);return res.status(200).json({ok:true});}await tgSendMessage(chat_id,"Comandos P44:\n✅ APROBAR <telegram_user_id>\n❌ DENEGAR <telegram_user_id> <motivo opcional>");return res.status(200).json({ok:true});}
   if(chat_id.toString()!==process.env.TEACHERS_CHAT_ID?.toString()&&(text.toUpperCase()==="REVISAR"||text==="/revisar")){const aviso="🔔 <b>REVISAR ACCESO P44</b>\n\n"+`🆔 Telegram ID: ${telegram_user_id}\n`+`🔤 Usuario: ${username?"@"+username:"-"}\n`+`📱 Teléfono: ${user.telefono??"-"}\n`+`📧 Email: ${user.email??"-"}\n`+`🎓 Curso: ${user.curso??"-"}\n`;await tgSendMessage(process.env.TEACHERS_CHAT_ID,aviso);await tgSendMessage(chat_id,"Perfecto ✅ He avisado al profesor para que revise tu acceso.");return res.status(200).json({ok:true});}
+  if(user.estado==="acceso_pendiente_de_solicitud"){
+    if(text.toUpperCase()==="HECHO"){
+      try {
+        const resultado=await intentarAdmision(telegram_user_id);
+        if(resultado==="aprobado") await tgSendMessage(chat_id,"✅ <b>Verificación completada</b>. Ya tienes acceso al grupo. ¡Un saludo! 👋");
+        else await tgSendMessage(chat_id,"⚠️ Aún no encontramos tu solicitud de acceso. Revisa el paso 2 en el Campus y escribe <b>HECHO</b> después.");
+      } catch(error) {
+        console.error("Error al reintentar entrada:",error);
+        await tgSendMessage(chat_id,"⚠️ No hemos podido comprobar tu solicitud ahora. Inténtalo de nuevo más tarde.");
+      }
+    } else await tgSendMessage(chat_id,"Tus datos ya están verificados. Solicita el acceso desde el Campus y escribe <b>HECHO</b>.");
+    return res.status(200).json({ok:true});
+  }
   if(user.estado==="acceso_p1"){if(text.toUpperCase()==="HECHO"){await updateUser(telegram_user_id,{estado:"acceso_p2"});await tgSendMessage(chat_id,msgPaso2());}else await tgSendMessage(chat_id,"Cuando lo hayas hecho, escribe <b>HECHO</b>.");return res.status(200).json({ok:true});}
   if(user.estado==="acceso_p2"){if(text.toUpperCase()==="HECHO"){await updateUser(telegram_user_id,{estado:"acceso_p3"});await tgSendMessage(chat_id,msgPaso3());}else await tgSendMessage(chat_id,"Cuando lo hayas hecho, escribe <b>HECHO</b>.");return res.status(200).json({ok:true});}
   if(user.estado==="acceso_p3"){if(!isValidLinePaso2(text)){await tgSendMessage(chat_id,"Formato incorrecto. Envíame exactamente 3 líneas. Ejemplo:\nMiguel García Fernández\nmiguel.acrapol@acrapol.es\nTotal44");return res.status(200).json({ok:true});}const{nombre,email,curso}=extractPaso2(text);await updateUser(telegram_user_id,{nombre,email,curso,estado:"acceso_p4"});await tgSendMessage(chat_id,msgPaso4(),shareContactKeyboard());return res.status(200).json({ok:true});}
