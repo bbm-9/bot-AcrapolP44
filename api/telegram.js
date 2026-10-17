@@ -41,7 +41,35 @@ function msgYaPendiente() { return "✅ Ya tengo tus datos y tu teléfono.\n\nTu
 function msgYaAprobado() { return "✅ Ya estás verificado.\n\nSi aún no tienes acceso al grupo, escribe <b>REVISAR</b>.\n\n(<i>Escribe MENÚ para volver al inicio</i>)"; }
 async function notifyTeachers(user, telegram_user_id, username, tg_name) {
   const text = "📥 <b>ALTA TELEGRAM P44 PENDIENTE</b>\n\n"+`👤 Nombre: ${user.nombre??"-"}\n`+`📧 Email: ${user.email??"-"}\n`+`🎓 Curso: ${user.curso??"-"}\n`+`📱 Teléfono: ${user.telefono??"-"}\n`+`🆔 Telegram ID: ${telegram_user_id}\n`+`🔤 Usuario: ${username?"@"+username:`<a href="tg://user?id=${telegram_user_id}">${tg_name||"Abrir perfil"}</a>`}\n\nEstado: Pendiente de verificación`;
-  await tgSendMessage(process.env.TEACHERS_CHAT_ID,text,verificationKeyboard(telegram_user_id));
+  const response = await fetch(TG("sendMessage"), {
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({chat_id:process.env.TEACHERS_CHAT_ID,text,parse_mode:"HTML",reply_markup:verificationKeyboard(telegram_user_id)})
+  });
+  const result = await response.json();
+  if(!result.ok) throw new Error("Error notificando profesores: "+result.description);
+  await updateUser(telegram_user_id,{mensaje_profesores_id:result.result.message_id});
+}
+
+async function actualizarFichaProfesores(alumnoId) {
+  const {data: alumno, error} = await supabase.from("telegram_onboarding_p44")
+    .select("mensaje_profesores_id,nombre,email,curso,telefono,username,estado")
+    .eq("telegram_user_id",alumnoId).maybeSingle();
+  if(error) throw error;
+  if(!alumno?.mensaje_profesores_id || alumno.estado !== "acceso_aprobado") return;
+  const texto = "📥 ALTA TELEGRAM P44\n\n"
+    + "👤 Nombre: " + (alumno.nombre ?? "-") + "\n"
+    + "📧 Email: " + (alumno.email ?? "-") + "\n"
+    + "🎓 Curso: " + (alumno.curso ?? "-") + "\n"
+    + "📱 Teléfono: " + (alumno.telefono ?? "-") + "\n"
+    + "🆔 Telegram ID: " + alumnoId + "\n"
+    + "🔤 Usuario: " + (alumno.username ? "@" + alumno.username : "-") + "\n\n"
+    + "Estado: ✅ APROBADO";
+  const response = await fetch(TG("editMessageText"), {
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({chat_id:process.env.TEACHERS_CHAT_ID,message_id:alumno.mensaje_profesores_id,texto:texto,text:texto})
+  });
+  const result = await response.json();
+  if(!result.ok) throw new Error("No se pudo actualizar ficha: "+result.description);
 }
 
 const avisoSinSolicitud = "¡Hola! 👋\n\nAunque en el Asistente Virtual te indicamos que tienes todos los pasos completados, <b>NO has realizado correctamente la solicitud de acceso al Grupo P44 (paso 2)</b>.\n\nPara que podamos aceptarte en el grupo, sigue estos pasos:\n\n<b>⚠️ MUY IMPORTANTE: hazlo con el móvil 📱</b>\n\n1️⃣ Accede al Campus de ACRAPOL y entra en el <b>Módulo 1</b>.\n\n2️⃣ Ve al apartado <b>INICIO (la casita)</b> y pincha en el enlace denominado <b>«Solicitud de acceso al Grupo P44»</b>.\n\n3️⃣ Se te abrirá la aplicación de Telegram. Pulsa <b>«Solicitar unirme al grupo»</b>.\n\nCuando completes los tres pasos correctamente, escribe: <b>HECHO</b>.\n\nUn saludo.";
@@ -85,6 +113,7 @@ export default async function handler(req,res) {
       try {
         if(await intentarAdmision(alumnoId) === "aprobado") {
           await tgSendMessage(alumnoId,"✅ <b>Verificación completada</b>. Ya tienes acceso al grupo. ¡Un saludo! 👋");
+          await actualizarFichaProfesores(alumnoId);
         }
       } catch(error) { console.error("Error aprobando solicitud posterior:",error); }
     }
@@ -112,7 +141,7 @@ export default async function handler(req,res) {
             await tgSendMessage(alumnoId,"✅ <b>Verificación completada</b>. Ya tienes acceso al grupo. ¡Un saludo! 👋");
             await tgEditMessageText(chat_id,cq.message.message_id,(cq.message.text||"").replace("Estado: Pendiente de verificación","Estado: ✅ APROBADO"));
           } else {
-            await updateUser(alumnoId,{estado:"acceso_pendiente_de_solicitud",acceso_concedido:false,verificado_por:"PROFESOR",fecha_verificacion:new Date().toISOString(),solicitud_grupo_pendiente:false});
+            await updateUser(alumnoId,{estado:"acceso_pendiente_de_solicitud",acceso_concedido:false,verificado_por:"PROFESOR",fecha_verificacion:new Date().toISOString(),solicitud_grupo_pendiente:false,mensaje_profesores_id:cq.message.message_id});
             await tgSendMessage(alumnoId,avisoSinSolicitud);
             await tgEditMessageText(chat_id,cq.message.message_id,(cq.message.text||"").replace("Estado: Pendiente de verificación","Estado: ⚠️ DATOS VERIFICADOS — FALTA SOLICITUD"));
           }
@@ -144,7 +173,7 @@ export default async function handler(req,res) {
     if(text.toUpperCase()==="HECHO"){
       try {
         const resultado=await intentarAdmision(telegram_user_id);
-        if(resultado==="aprobado") await tgSendMessage(chat_id,"✅ <b>Verificación completada</b>. Ya tienes acceso al grupo. ¡Un saludo! 👋");
+        if(resultado==="aprobado") { await tgSendMessage(chat_id,"✅ <b>Verificación completada</b>. Ya tienes acceso al grupo. ¡Un saludo! 👋"); await actualizarFichaProfesores(telegram_user_id); }
         else await tgSendMessage(chat_id,"⚠️ Aún no encontramos tu solicitud de acceso. Revisa el paso 2 en el Campus y escribe <b>HECHO</b> después.");
       } catch(error) {
         console.error("Error al reintentar entrada:",error);
