@@ -45,6 +45,12 @@ async function notifyTeachers(user, telegram_user_id, username, tg_name) {
 }
 export default async function handler(req,res) {
   if(req.method!=="POST") return res.status(200).send("ok"); const update=req.body;
+  // Ignorar mensajes y botones del grupo de alumnos P44; las solicitudes de acceso se gestionarán aparte.
+  const groupId = process.env.TELEGRAM_GROUP_ID;
+  if(groupId && (String(update.message?.chat?.id) === groupId || String(update.callback_query?.message?.chat?.id) === groupId)) {
+    return res.status(200).json({ok:true});
+  }
+
   if(update.callback_query){
     const cq=update.callback_query; await tgAnswerCallbackQuery(cq.id); const chat_id=cq.message.chat.id, telegram_user_id=cq.from.id, username=cq.from.username??null, data=cq.data;
     if(chat_id.toString()===process.env.TEACHERS_CHAT_ID?.toString()&&(data.startsWith("aprobar:")||data.startsWith("denegar:"))){
