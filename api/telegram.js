@@ -15,7 +15,7 @@ async function tgAnswerCallbackQuery(callback_query_id) {
 async function tgEditMessageText(chat_id, message_id, text) {
   await fetch(TG("editMessageText"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id, message_id, text }) });
 }
-function mainMenuKeyboard() { return { inline_keyboard: [[{ text: "🎓 Acceder al grupo de Telegram P44", callback_data: "acceso_grupo" }],[{ text: "❓ Escribir mensaje a Miguel", url: "https://t.me/Miguel_ACRAPOL" }]] }; }
+function mainMenuKeyboard() { return { inline_keyboard: [[{ text: "🎓 Acceder al grupo de Telegram P44", callback_data: "acceso_grupo" }],[{ text: "❓ Escribir mensaje a Miguel (Coordinador del curso de conocimientos)", url: "https://t.me/Miguel_ACRAPOL" }]] }; }
 function verificationKeyboard(telegram_user_id) { return { inline_keyboard: [[{ text: "✅ APROBAR", callback_data: `aprobar:${telegram_user_id}` }, { text: "❌ DENEGAR", callback_data: `denegar:${telegram_user_id}` }]] }; }
 function shareContactKeyboard() { return { keyboard: [[{ text: "📱 Enviar mi contacto", request_contact: true }]], resize_keyboard: true, is_persistent: true }; }
 function removeKeyboard() { return { remove_keyboard: true }; }
