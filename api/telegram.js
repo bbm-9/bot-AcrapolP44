@@ -127,7 +127,7 @@ export default async function handler(req,res) {
     const linkedUrls = [...(groupMessage.entities ?? []), ...(groupMessage.caption_entities ?? [])]
       .filter(entity => entity.type === "text_link" && typeof entity.url === "string")
       .map(entity => entity.url).join(" ");
-    const containsWhatsappInvite = /(?:^|[^a-z0-9.-])(?:https?:\\/\\/)?(?:www\\.)?chat\\.whatsapp\\.com\\/[a-z0-9_-]+/i.test(visibleText + " " + linkedUrls);
+    const containsWhatsappInvite = /(?:^|[^a-z0-9.-])(?:https?:\/\/)?(?:www\.)?chat\.whatsapp\.com\/[a-z0-9_-]+/i.test(visibleText + " " + linkedUrls);
     if(containsWhatsappInvite) {
       try {
         const response = await fetch(TG("deleteMessage"), {
