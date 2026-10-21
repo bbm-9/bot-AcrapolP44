@@ -119,9 +119,31 @@ export default async function handler(req,res) {
     }
     return res.status(200).json({ok:true});
   }
-  // Ignorar mensajes y botones del grupo de alumnos P44; las solicitudes de acceso se gestionarán aparte.
+  // Moderación aislada del grupo P44: borrar solo invitaciones a grupos de WhatsApp.
   const groupId = process.env.TELEGRAM_GROUP_ID;
-  if(groupId && (String(update.message?.chat?.id) === groupId || String(update.callback_query?.message?.chat?.id) === groupId)) {
+  const groupMessage = update.message ?? update.edited_message;
+  if(groupId && String(groupMessage?.chat?.id) === groupId) {
+    const visibleText = [groupMessage.text, groupMessage.caption].filter(Boolean).join(" ");
+    const linkedUrls = [...(groupMessage.entities ?? []), ...(groupMessage.caption_entities ?? [])]
+      .filter(entity => entity.type === "text_link" && typeof entity.url === "string")
+      .map(entity => entity.url).join(" ");
+    const containsWhatsappInvite = /(?:^|[^a-z0-9.-])(?:https?:\\/\\/)?(?:www\\.)?chat\\.whatsapp\\.com\\/[a-z0-9_-]+/i.test(visibleText + " " + linkedUrls);
+    if(containsWhatsappInvite) {
+      try {
+        const response = await fetch(TG("deleteMessage"), {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ chat_id: groupMessage.chat.id, message_id: groupMessage.message_id })
+        });
+        const result = await response.json();
+        if(!result.ok) console.error("No se pudo eliminar enlace de WhatsApp:", result.description);
+      } catch(error) {
+        console.error("Error moderando enlace de WhatsApp:", error);
+      }
+    }
+    return res.status(200).json({ok:true});
+  }
+  if(groupId && String(update.callback_query?.message?.chat?.id) === groupId) {
     return res.status(200).json({ok:true});
   }
 
