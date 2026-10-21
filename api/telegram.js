@@ -29,8 +29,19 @@ async function updateUser(telegram_user_id, patch) {
   const { error } = await supabase.from("telegram_onboarding_p44").update({ ...patch, ultima_interaccion: new Date().toISOString() }).eq("telegram_user_id", telegram_user_id);
   if (error) throw error;
 }
-function isValidLinePaso2(text) { const parts = text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean); if (parts.length !== 3) return false; const email=parts[1]; return email.includes("@") && email.length>=6; }
-function extractPaso2(text) { const [nombre,email,curso]=text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean); return {nombre,email,curso}; }
+// Normalizar saltos de línea y caracteres invisibles habituales al copiar desde móvil o escritorio.
+function parseDatosPaso3(text) {
+  const parts = String(text ?? "")
+    .replace(/\r\n?|[\u0085\u2028\u2029]/g, "\n")
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+    .split("\n")
+    .map(line => line.replace(/\u00A0/g, " ").trim())
+    .filter(Boolean);
+  if (parts.length !== 3) return null;
+  const [nombre, email, curso] = parts;
+  if (!nombre || !curso || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  return { nombre, email, curso };
+}
 function msgInicio() { return "👋 Bienvenido a <b>ACRAPOL</b>, la academia que eligen los mejores.\n\nSelecciona una de las opciones.\n\n‼️Si vas a solicitar acceso al grupo de Telegram recomendamos hacer los pasos desde tu <b><u>teléfono móvil</u></b> 📱\n\nPuedes escribir <b>MENÚ</b> en cualquier momento para volver al inicio."; }
 function msgPaso1() { return "Paso 1/5 🔴\n\nDentro del curso <b><u>debes</u></b> realizar estas acciones:\n\n1️⃣ Lectura obligatoria del documento <b>«EXPLICACIÓN DEL CURSO»</b>. Recuerda que, una vez leído, debes <b>marcar el «tick</b>✅» que aparece a la izquierda del enlace del documento;\n2️⃣ Rellenar el <b>«FORMULARIO DEL ALUMNO»</b> con datos veraces; y\n3️⃣ Aceptar las <b>«CONDICIONES Y NORMAS DE USO»</b>.\n\nCuando lo hayas hecho todo, escribe: <b>HECHO</b>\n\n(<i>Escribe MENÚ para volver al inicio</i>)"; }
 function msgPaso2() { return "Paso 2/5 🛃\n\nSolicita el acceso al grupo desde el Campus:\n\n1️⃣ Inicia sesión en el Campus de ACRAPOL, entra en tus cursos → <b>Accede al MÓDULO 1</b>;\n2️⃣ Ve al apartado INICIO (la casita) → Pincha en el enlace <b>«Solicitud de acceso al Grupo P44»</b>.\n3️⃣ Se te abrirá la aplicación de Telegram → Pulsa en <b>«Solicitar unirme»</b>\n\nCuando completes los tres pasos, escribe: <b>HECHO</b>\n\n(<i>Escribe MENÚ para volver al inicio</i>)"; }
@@ -206,7 +217,7 @@ export default async function handler(req,res) {
   }
   if(user.estado==="acceso_p1"){if(text.toUpperCase()==="HECHO"){await updateUser(telegram_user_id,{estado:"acceso_p2"});await tgSendMessage(chat_id,msgPaso2());}else await tgSendMessage(chat_id,"Cuando lo hayas hecho, escribe <b>HECHO</b>.");return res.status(200).json({ok:true});}
   if(user.estado==="acceso_p2"){if(text.toUpperCase()==="HECHO"){await updateUser(telegram_user_id,{estado:"acceso_p3"});await tgSendMessage(chat_id,msgPaso3());}else await tgSendMessage(chat_id,"Cuando lo hayas hecho, escribe <b>HECHO</b>.");return res.status(200).json({ok:true});}
-  if(user.estado==="acceso_p3"){if(!isValidLinePaso2(text)){await tgSendMessage(chat_id,"Formato incorrecto. Envíame exactamente 3 líneas. Ejemplo:\nMiguel García Fernández\nmiguel.acrapol@acrapol.es\nTotal44");return res.status(200).json({ok:true});}const{nombre,email,curso}=extractPaso2(text);await updateUser(telegram_user_id,{nombre,email,curso,estado:"acceso_p4"});await tgSendMessage(chat_id,msgPaso4(),shareContactKeyboard());return res.status(200).json({ok:true});}
+  if(user.estado==="acceso_p3"){const datos=parseDatosPaso3(text);if(!datos){await tgSendMessage(chat_id,"Formato incorrecto. Envíame exactamente 3 líneas. Ejemplo:\nMiguel García Fernández\nmiguel.acrapol@acrapol.es\nTotal44");return res.status(200).json({ok:true});}const{nombre,email,curso}=datos;await updateUser(telegram_user_id,{nombre,email,curso,estado:"acceso_p4"});await tgSendMessage(chat_id,msgPaso4(),shareContactKeyboard());return res.status(200).json({ok:true});}
   if(user.estado==="acceso_p4"){if(msg.contact&&msg.contact.phone_number){if(!msg.contact.user_id||msg.contact.user_id!==telegram_user_id){await tgSendMessage(chat_id,"❌ Ese no es tu contacto.\nPulsa <b>📱 Enviar mi contacto</b> (no vale enviar un contacto desde la agenda).",shareContactKeyboard());return res.status(200).json({ok:true});}await updateUser(telegram_user_id,{telefono:msg.contact.phone_number,estado:"acceso_pendiente_revision"});const refreshed=await getOrCreateUser(telegram_user_id,username);await tgSendMessage(chat_id,"Contacto recibido ✅",removeKeyboard());await tgSendMessage(chat_id,msgPaso5());await notifyTeachers(refreshed,telegram_user_id,username,tg_name);return res.status(200).json({ok:true});}await tgSendMessage(chat_id,"Pulsa <b>📱 Enviar mi contacto</b> (y asegúrate de tener “¿Quién puede ver mi número?” en <b>TODOS</b>).",shareContactKeyboard());return res.status(200).json({ok:true});}
   await tgSendMessage(chat_id,msgInicio(),mainMenuKeyboard());return res.status(200).json({ok:true});
 }
