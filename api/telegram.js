@@ -147,7 +147,34 @@ export default async function handler(req,res) {
           body: JSON.stringify({ chat_id: groupMessage.chat.id, message_id: groupMessage.message_id })
         });
         const result = await response.json();
-        if(!result.ok) console.error("No se pudo eliminar enlace de WhatsApp:", result.description);
+        if(!result.ok) {
+          console.error("No se pudo eliminar enlace de WhatsApp:", result.description);
+        } else {
+          // Avisar únicamente después de confirmar la eliminación. No afecta al onboarding.
+          try {
+            const escapeHtml = value => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            const author = groupMessage.from;
+            const authorName = [author?.first_name, author?.last_name].filter(Boolean).join(" ") || "Desconocido";
+            const username = author?.username ? "@" + author.username : "Sin username";
+            const original = [visibleText, linkedUrls].filter(Boolean).join("\n");
+            const date = new Date((groupMessage.date ?? Math.floor(Date.now()/1000))*1000).toLocaleString("es-ES",{timeZone:"Europe/Madrid"});
+            const notice = "🛡️ <b>ACRAPOL P44 — MENSAJE ELIMINADO</b>\n\n"
+              + "👤 Alumno: " + escapeHtml(authorName) + "\n"
+              + "🔤 Usuario: " + escapeHtml(username) + "\n"
+              + "🆔 Telegram ID: " + escapeHtml(author?.id ?? "Desconocido") + "\n"
+              + "📅 Fecha del mensaje: " + escapeHtml(date) + "\n"
+              + "📌 Motivo: Enlace de invitación a grupo de WhatsApp\n\n"
+              + "💬 <b>Mensaje original:</b>\n<pre>" + escapeHtml(original.slice(0,2500)) + "</pre>";
+            const notification = await fetch(TG("sendMessage"),{
+              method:"POST",headers:{"content-type":"application/json"},
+              body:JSON.stringify({chat_id:process.env.TEACHERS_CHAT_ID,text:notice,parse_mode:"HTML"})
+            });
+            const notificationResult = await notification.json();
+            if(!notificationResult.ok) console.error("No se pudo avisar a profesores de eliminación:",notificationResult.description);
+          } catch(notifyError) {
+            console.error("Error enviando registro de moderación a profesores:",notifyError);
+          }
+        }
       } catch(error) {
         console.error("Error moderando enlace de WhatsApp:", error);
       }
